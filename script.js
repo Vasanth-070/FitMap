@@ -12,6 +12,7 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 class Workout {
+  clicks = 0;
   date = new Date();
   description;
   id = (Date.now() + '').slice(-10);
@@ -21,8 +22,23 @@ class Workout {
     this.cords = cords;
   }
   _SetDescription() {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    this.description = `${this.type === 'running' ? 'Running' : 'Cycling'} on ${months[this.date.getMonth()]} ${this.date.getDate()}`;
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    this.description = `${this.type === 'running' ? 'Running' : 'Cycling'} on ${
+      months[this.date.getMonth()]
+    } ${this.date.getDate()}`;
   }
 }
 class Running extends Workout {
@@ -61,8 +77,11 @@ class App {
 
   constructor() {
     this._getPosition();
+    this._extractDataFromLocal();
+    //Event listeners
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleEvent);
+    containerWorkouts.addEventListener('click', this._zoomToWorkout.bind(this));
   }
 
   _getPosition() {
@@ -87,6 +106,9 @@ class App {
     }).addTo(this.#map);
 
     this.#map.on('click', this._showForm.bind(this));
+    this.#workouts.forEach(work => {
+      this._renderWorkoutOnMap(work);
+    });
   }
 
   _showForm(clickE) {
@@ -97,7 +119,9 @@ class App {
   _hideForm() {
     form.style.display = 'none';
     form.classList.add('hidden');
-    setTimeout(() => { form.style.display = 'grid' }, 1000);
+    setTimeout(() => {
+      form.style.display = 'grid';
+    }, 1000);
   }
 
   _toggleEvent(e) {
@@ -112,7 +136,6 @@ class App {
     const type = inputType.value;
     const distance = +inputDistance.value;
     const duration = +inputDuration.value;
-    console.log(distance);
     let workout;
     const { lat, lng } = this.#clickEvent.latlng;
 
@@ -148,11 +171,20 @@ class App {
     this.#workouts.push(workout);
 
     //Show workout popup on map
-    inputCadence.value = inputDistance.value = inputDuration.value = inputElevation.value = '';
+    inputCadence.value =
+      inputDistance.value =
+      inputDuration.value =
+      inputElevation.value =
+        '';
 
     this._renderWorkoutOnMap(workout);
     this._renderWorkout(workout);
     this._hideForm();
+    this._storeToLocal(workout);
+    console.log(workout);
+  }
+  _storeToLocal(workout) {
+    localStorage.setItem('workout', JSON.stringify(this.#workouts));
   }
   _renderWorkoutOnMap(workout) {
     L.marker(...[workout.cords])
@@ -174,7 +206,9 @@ class App {
     <li class="workout workout--${workout.type}" data-id="${workout.id}">
       <h2 class="workout__title">${workout.description}</h2>
       <div class="workout__details">
-        <span class="workout__icon">${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♂️'}</span>
+        <span class="workout__icon">${
+          workout.type === 'running' ? '🏃‍♂️' : '🚴‍♂️'
+        }</span>
         <span class="workout__value">${workout.distance}</span>
         <span class="workout__unit">km</span>
       </div>
@@ -215,6 +249,28 @@ class App {
     `;
     }
     form.insertAdjacentHTML('afterend', html);
+  }
+  _zoomToWorkout(e) {
+    const workEl = e.target.closest('.workout');
+    if (!workEl) return;
+    const workout = this.#workouts.find(work => work.id === workEl.dataset.id);
+    this.#map.setView(workout.cords, 13, {
+      animate: true,
+      pan: { duration: 2 },
+    });
+    this._countClick(workout);
+  }
+  _countClick(work) {
+    work.clicks++;
+  }
+  _extractDataFromLocal() {
+    const data = JSON.parse(localStorage.getItem('workout'));
+    console.log(data);
+    if (!data) return;
+    this.#workouts = data;
+    this.#workouts.forEach(work => {
+      this._renderWorkout(work);
+    });
   }
 }
 const app = new App();
